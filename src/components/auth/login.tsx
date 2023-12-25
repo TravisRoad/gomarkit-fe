@@ -4,24 +4,32 @@ import { ChangeEvent, useState, useEffect } from 'react';
 import { debounce } from 'lodash';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import useUserInfo from '@/store/store';
+import { json } from 'stream/consumers';
 
 interface Credential {
 	Username: string;
 	Password: string;
 }
 
-const isLogin = async (): Promise<boolean> => {
+const isLogin = async (): Promise<any> => {
 	const ans = await fetch('/api/auth/islogin', {
 		method: 'GET',
 		headers: {
 			'Content-Type': 'application/json',
 		},
 	})
-		.then((res) => {
-			return res.status == 200;
+		.then((res) => res.json())
+		.then((data) => {
+			if (data.status > 0) {
+				return undefined;
+			}
+			return data;
 		})
 		.catch((_e) => {
-			return false;
+			console.log(_e);
+
+			return undefined;
 		});
 	return ans;
 };
@@ -32,16 +40,53 @@ export default function Login() {
 		Password: '',
 	});
 	const router = useRouter();
+	const userinfo = useUserInfo();
 
 	useEffect(() => {
 		const checkLogin = async () => {
-			const hasLogin: boolean = await isLogin();
-			if (hasLogin) {
+			isLogin().then((res) => {
+				if (!res) {
+					return;
+				}
 				router.push('/');
-			}
+				console.log(res);
+
+				const data = res.data;
+				userinfo.Set({
+					ID: data.id,
+					UserName: data.username,
+					Role: data.role,
+				});
+			});
 		};
 		checkLogin();
 	}, []);
+
+	const login = () => {
+		fetch('/api/auth/login', {
+			method: 'POST',
+			body: JSON.stringify(cred),
+		})
+			.then((res) => {
+				if (res.status != 200) {
+					toast.error('Invalid credentials');
+					return;
+				}
+				toast.success('success');
+				router.push('/');
+				res.json().then((d) => {
+					const data = d.data;
+					userinfo.Set({
+						ID: data.id,
+						UserName: data.username,
+						Role: data.role,
+					});
+				});
+			})
+			.catch((err) => {
+				toast.error(err.message);
+			});
+	};
 
 	const form = [
 		{
@@ -59,24 +104,6 @@ export default function Login() {
 			},
 		},
 	];
-
-	const login = () => {
-		fetch('/api/auth/login', {
-			method: 'POST',
-			body: JSON.stringify(cred),
-		})
-			.then((res) => {
-				if (res.status != 200) {
-					toast.error('Invalid credentials');
-					return;
-				}
-				toast.success('success');
-				router.push('/');
-			})
-			.catch((err) => {
-				toast.error(err.message);
-			});
-	};
 
 	return (
 		<>
@@ -100,7 +127,7 @@ export default function Login() {
 				</div>
 				<div className="w-full flex flex-col my-4">
 					{form.map((it) => (
-						<div className="mb-2">
+						<div className="mb-2" key={it.name}>
 							<label className="w-2/3 mx-auto md:mx-1 md:w-1/6 block md:text-right pr-2 md:float-left font-bold ">
 								{it.name}
 							</label>
