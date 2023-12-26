@@ -1,17 +1,53 @@
 'use client';
 
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useMemo, useState } from 'react';
 import { debounce } from 'lodash';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import useUserInfo from '@/store/store';
+import useStore, { useUserInfo } from '@/store/store';
 
 interface Credential {
 	Username: string;
 	Password: string;
 }
 
-export default function Login() {
+export default function Login({ hasLogin }: { hasLogin: boolean }) {
+	if (hasLogin) {
+		return <AlreadyLogin />;
+	}
+	return <LoginForm />;
+}
+
+const AlreadyLogin = () => {
+	const userinfo = useStore(useUserInfo, (s) => s);
+	const logout = async () => {
+		const success = await fetch('/api/auth/logout', {
+			method: 'POST',
+		}).then((res) => res.status === 200);
+		if (!success) {
+			toast.error('Logout fail');
+		}
+		userinfo?.Reset();
+		toast.success('Logout success', { duration: 2500 });
+		setTimeout(() => {
+			window?.location.reload();
+		}, 2500);
+	};
+	return (
+		<div className="w-2/3 mx-auto text-center">
+			<span>Already logged in as&nbsp;</span>
+			<span className="font-bold">{userinfo?.UserName}</span>
+			<div
+				className="underline cursor-pointer"
+				onClick={debounce(logout, 200)}
+			>
+				logout
+			</div>
+		</div>
+	);
+};
+
+const LoginForm = () => {
 	const [cred, setCred] = useState<Credential>({
 		Username: '',
 		Password: '',
@@ -112,4 +148,4 @@ export default function Login() {
 			</div>
 		</>
 	);
-}
+};
